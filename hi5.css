@@ -1,0 +1,75 @@
+.tab_body{border:1px solid #666;clear:both;}
+.tab_show{padding:1.5em;}
+.tab_hide{padding:1.5em;display:none;}
+.tab{position:relative;width:100%;height:3em;width:45em;}
+.tab_title{margin:0;padding:0;position:absolute;bottom:-1px;width:45em;}
+.tab_title span{width:8em;float:left;padding:4px 0;margin:1px 2px 0 0;text-align:center;font-family:tahoma,verdana,sans-serif;
+font-size:85%;color:#333;border-top-left-radius:5px;border-top-right-radius:5px;}
+.tab_title .tab_front{border:1px solid #666;border-bottom:none;background:#FFF3B3;padding-bottom:6px;margin-top:0;}
+.tab_back{background:#FFFAE1;border:1px solid #AAA;border-bottom:none;cursor:pointer;}
+.tab_back:hover{margin-top:0;border-color:#666;background:#FFF7CD;padding-bottom:5px;}
+
+.toolbar{position:absolute;z-index:89;width:150px}
+.toolbar img{margin:5px;cursor:pointer;opacity:0.6}
+.hi5_dialog{border:1px solid #222;padding:2em;border-radius:8px;background-color:white}
+
+.table
+{
+	font-family: "Lucida Sans Unicode", "Lucida Grande", Sans-Serif;
+	font-size: 0.8em;
+	background: #fff;
+	width: 100%;
+	border-collapse: collapse;
+	text-align: left;
+}
+.table th
+{
+	font-size: 1em;
+	font-weight: normal;
+	color: #039;
+	padding: 10px 8px;
+	border-bottom: 2px solid #6678b1;
+}
+.table td
+{
+	border-bottom: 1px solid #ccc;
+	color: #669;
+	padding: 6px 8px;
+}
+.table tbody tr:hover td
+{
+	background: #d0dafd;
+	color: #339;
+}
+
+#hi5_notifer_all{
+	position:fixed; bottom: 0; right: 6px; z-index:999;width:324px;
+}
+
+.hi5_notifer{
+	padding: 12px;margin: 0 0 6px 0;background-color: #030;
+	opacity: 0.8; color: #fff; font: normal 13px "Droid Sans", sans-serif;
+    border-radius: 3px; box-shadow: #999 0 0 12px; width: 300px
+}
+
+.hi5_notifer:hover{
+	opacity:1;box-shadow:#000 0 0 12px;
+}
+
+.hi5_notifer_title{
+	font-size:1.1em;font-weight:bold;padding-bottom:6px;
+}
+
+.hi5_notifer_icon{
+	float:left;width:1.2em;height:1.2em;margin-right:.3em;
+}
+
+.hi5_notifer_button{
+	float:right;width:25px;height:25px;margin-left:.3em;
+	cursor:pointer;
+}
+.hi5_notifer_count{
+	color:red;float:right;
+}
+
+

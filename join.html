@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="chrome=1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Spark View</title>
+<meta name="viewport"
+	content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<script type="text/javascript" src="resource.js"></script>
+<script type="text/javascript" src="hi5_min.js"></script>
+<script type="text/javascript" src="surface_min.js"></script>
+<script type="text/javascript" src="rdp_min.js"></script>
+
+<link rel="stylesheet" href="hi5.css" />
+<link rel="stylesheet" href="rdp.css" />
+
+</head>
+<body>
+	<script type="text/javascript">
+		function initUI(){
+			var args = hi5.tool.queryToObj();
+			var gw = hi5.$("gateway"); 
+			var h = gw.value;
+			if (!h){
+				h = args.gateway;//gateway value in the url
+				if (!h){
+					h = window.location.host;
+					if (!h) h = "localhost";
+				}
+				gw.value = h;
+			}
+			
+			var control = hi5.$("requestControl");
+			if (control){
+				control.onclick = function(e){
+					svManager.getInstance().requestControl();
+				};
+			}
+			
+			var elm = hi5.$("sessionId");
+			if (args.id){
+				elm.value = args.id;
+				join();
+				return;
+			}
+			elm.focus();
+			
+
+		}
+		window.addEventListener('load', initUI, false);
+		function join() {
+			var id = hi5.$("sessionId").value;
+			var gateway = (("https:" == location.protocol) ?  "wss://" : "ws://") + hi5.$("gateway").value;
+			//you can transfer any other parameter here
+			var ws = gateway + "/JOIN?id=" + id + "&name=" + hi5.$("joinas").value;
+			var r = new svGlobal.Rdp(ws);
+			var inputArea = hi5.$("inputArea");
+
+			r.addSurface(new svGlobal.LocalInterface());
+			r.onclose = function(){
+				r.hide();
+				inputArea.style.display = "block";
+			};
+			r.run();
+			inputArea.style.display = "none";
+			return false;
+		}
+	</script>
+
+	<div id="inputArea">
+	<form action="" onsubmit="return join();">
+	Spark Gateway: <input type="text" name="gateway" id="gateway" required/>
+	Session id:<input type="text" placeholder="9-digit number" id="sessionId" name="id" />
+	Name:<input type="text" placeholder="join as" name="name" id="joinas"/>
+	<input type="submit" value="Join" />
+	</form>
+	</div>
+
+	<div>
+		<canvas id="remotectrl" width="800" height="600"></canvas>
+	</div>
+
+
+	<!-- filecontainer is used for file share -->
+	<div id="filecontainer" style="overflow:auto;display:none; width:85%">
+	</div>
+	<div id="appinfo" class="appdlg">
+		<img alt="" src="info.png" style="float:left">	
+		<table>
+		<tr><td><b>Session id:</b></td><td><span id="numericId"></span><br></td></tr>
+		<tr><td></td><td align="right"><input type="button" id="requestControl" value="Request Control" disabled="disabled" /></td></tr>
+		</table>
+	</div>
+	
+</body>
+</html>

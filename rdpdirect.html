@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="chrome=1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Spark View</title>
+<meta name="viewport"
+	content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+
+<link rel="stylesheet" href="hi5.css" />
+<link rel="stylesheet" href="rdp.css" />
+
+<script type="text/javascript" src="resource.js"></script>
+<script type="text/javascript" src="hi5_min.js"></script>
+<script type="text/javascript" src="surface_min.js"></script>
+<script type="text/javascript" src="rdp_min.js"></script>
+
+
+</head>
+<body>
+
+	<div>
+		<canvas id="remotectrl" width="800" height="600"></canvas>
+	</div>
+
+
+	<script type="text/javascript">
+		window.onload = function() {
+			//here are three ways to create a Rdp instance:
+			var q = location.search;
+			var r;
+			if (q.length < 1){//first way, used by login.html
+				r = new svGlobal.Rdp2();
+			}
+			else{
+				q = q.substring(1);
+				//is web+rdp: protocol
+				var dec = decodeURIComponent(q);
+				var isWebRdp = (dec.indexOf("web+rdp:") == 0);
+				if (isWebRdp){//second, you can always use http://xxx.xxx.x.x/rdpdirect.html?web+rdp:192.168.8.8 to access 192.168.8.8
+					q = dec;
+					q = q.substring(8);
+					var idx = q.indexOf(":");
+					var svr = (idx > 0) ? q.substring(0, idx) : q;
+					var port = parseInt((idx > 0) ? q.substring(idx + 1) : "3389");
+					var session = new Object();
+					try{
+						var gwDefined = window.opener != null && ("sparkGateway" in window.opener); 
+						session["gateway"] = gwDefined ? window.opener.sparkGateway : location.host;//otherwise we think the gateway address is same as host address
+						if (window.opener != null && ("sparkSession" in window.opener)){
+							session["session"] = window.opener.sparkSession;
+						}
+					}catch(e){
+						
+					};
+					session["server"] = svr;
+					session["port"] = port;
+					session["width"] = window.innerWidth;
+					session["height"] = window.innerHeight;
+					r = new svGlobal.Rdp2(session);
+				}
+				else{//third, process normal parameters transfered from url like: http://xxx.xxx.x.x/rdpdirect.html?gateway=xx&server=yy&width=ww&height=hh&color=16
+					var args = hi5.tool.queryToObj(q);
+
+					var p = ("https:" == location.protocol) ? "wss://" : "ws://";
+					var w = args['width'] || window.innerWidth;
+					var h = args['height'] || window.innerHeight;
+					r = new svGlobal.Rdp(p + args['gateway'] + "/RDP?" + q, w, h, args['color']);
+					
+				}
+			}
+
+			r.addSurface(new svGlobal.LocalInterface());
+			
+			r.run();
+		}
+	</script>
+	<!-- filecontainer is used for file share -->
+	<div id="filecontainer" style="overflow:auto;display:none; width:85%">
+	</div>
+	<div id="appinfo" class="appdlg">
+		<img alt="" src="info.png" style="float:left">	
+		<table>
+		<tr><td align="right"><b>Connected to:</b></td><td><span id="connectingTo"></span><br></td></tr>
+		<tr><td align="right"><b>Session id:</b></td><td><span id="numericId"></span><br></td></tr>
+		<tr><td align="right"><b>Join mode:</b></td><td>
+		<select id="joinSelect">
+			<option value="0">Every one can control</option>
+			<option value="1">Only one can control</option>
+		</select><br></td></tr>
+		<tr><td colspan="2"><b>Join this session with following link:</b><br><a id="joinLink" target="_blank"></a></td></tr>
+		<tr><td></td><td align="right"><input type="button" id="requestControl" value="Request Control" disabled="disabled" /></td></tr>
+		</table>
+	</div>
+	
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="chrome=1">
+<title>Spark Player</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="application-name" content="Spark Player" />
+<link rel="apple-touch-icon" href="rdp.png" />
+<meta name="application-name" content="Spark Player" />
+<link rel="SHORTCUT ICON" href="rdp.ico" />
+<link rel="icon" href="rdp32.png" sizes="32x32" />
+<link rel="icon" href="rdp48.png" sizes="48x48" />
+<script type="text/javascript" src="resource.js"></script>
+<script type="text/javascript" src="hi5_min.js"></script>
+<script type="text/javascript" src="surface_min.js"></script>
+<script type="text/javascript" src="rdp_min.js"></script>
+<script type="text/javascript" src="player_min.js"></script>
+
+<style>
+
+.seekbar {
+	padding: 1px;
+	border: 1px solid #222;
+	height: 4px;
+	width: 800px;
+	background-color: #ddd;
+}
+
+.seekpos {
+	height: 100%;
+	float: left;
+	width: 100%;
+	background-color: #8c3;
+}
+</style>
+
+</head>
+<body>
+
+	<!--[if IE]>
+    <script type="text/javascript" 
+     src="http://ajax.googleapis.com/ajax/libs/chrome-frame/1/CFInstall.min.js"></script>
+
+    <style>
+     .chromeFrameInstallDefaultStyle {
+       width: 70%; 
+       border: 5px solid blue;
+     }
+    </style>
+
+    <script>
+     // The conditional ensures that this code will only execute in IE,
+     // Therefore we can use the IE-specific attachEvent without worry
+     window.attachEvent("onload", function() {
+       CFInstall.check({
+       mode: "overlay"
+       });
+     });
+    </script>
+  <![endif]-->
+
+	<div>
+		<canvas id="remotectrl" width="800" height="600" style="border: 1px solid #222"></canvas>
+		<div id="seekbar" class="seekbar">
+			<div id="seekpos" class="seekpos"></div>
+		</div>
+	</div>
+<script type="text/javascript">
+var seekpos = document.getElementById("seekpos");
+var player = null;
+
+function initPlayer(p){
+	p.onopened = function(info){
+		document.getElementById("playMode").value = "Normal Mode";
+		var fi = document.getElementById("fileInfo");
+		fi.innerHTML = "Size: " + hi5.tool.bytesToSize(info.size) + ", Video length: " + (info.length / (1000 * 60)).toFixed(2) + " minutes";
+		document.getElementById("seekbar").style.width = info.width + "px";
+	};
+	p.onprogress = function(played, total){
+		seekpos.style.width = (played / total * 100) + "%"; 
+	};
+}
+window.addEventListener('load', function(){
+	function handleFiles(files){
+		if (files.length == 0) return;
+		if (player){
+			player.close();
+		}
+		player = new svGlobal.RdpPlayer();
+		initPlayer(player);
+		player.setSource(files[0]); 
+		player.play();
+		//player.speedup(true);
+	}
+	var c = document.getElementById("remotectrl");
+	svGlobal.util.initMapDisk(c, handleFiles);
+	
+	function handleFileSelect(e){
+		handleFiles(e.target.files);
+	}
+	document.getElementById("rdpv").addEventListener('change', handleFileSelect, false);
+}, false);
+
+function setMode(){
+	var mode = document.getElementById("playMode");
+	var scanMode = mode.value == "Normal Mode"; 
+	player.scan(scanMode);
+	
+	if (scanMode){
+		mode.value = "Scan Mode";
+	}else{
+		mode.value = "Normal Mode";
+	}
+}
+
+function broadcast(file){
+	var protocol = ("https:" == location.protocol) ? "wss://" : "ws://";
+	var gateway = window.location.host;
+	if (gateway.length < 1) gateway = "localhost";
+	var url = protocol + gateway + "/PLAY?f=" + file;
+	if (player){
+		player.close();
+	}
+	player = new Rdp(url);
+	initPlayer(player);
+	player.addSurface(new svGlobal.LocalInterface());
+	player.run();
+}
+
+</script>
+
+
+<p>
+<input type="button" value="Play a file on server" onclick = "broadcast('/temp/test.rdpv');" />
+<input type="button" value="Play" onclick = "player.play();" /> 
+<input type="button" value="Pause" onclick = "player.pause();" />
+<input type="button" value="Stop" onclick = "player.close();" />  
+<input type="button" value="Normal Mode" id="playMode" onclick = "setMode();" />
+<input type="file" id="rdpv" name="rdpv" /> or drag and drop a .rdpv file</p>
+<p id="fileInfo"></p>
+
+</body>
+</html>

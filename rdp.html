@@ -1,0 +1,718 @@
+<!doctype html>
+<html>
+<head><meta http-equiv="X-UA-Compatible" content="chrome=1">
+<title>Spark View</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="google-site-verification"
+	content="MIFiVsZ89WxCtPsvYT1rboUGMpxTLXJ5xTCGkqumhlc" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="application-name" content="Spark RDP" />
+<link rel="apple-touch-icon" href="rdp.png" />
+<meta name="application-name" content="Spark View" />
+<meta name="description"
+	content="Remotely view and contrl your computer with RDP protocol" />
+<link rel="SHORTCUT ICON" href="rdp.ico" />
+<link rel="icon" href="rdp32.png" sizes="32x32" />
+<link rel="icon" href="rdp48.png" sizes="48x48" />
+
+<link rel="stylesheet" href="hi5.css" />
+<link rel="stylesheet" href="rdp.css" />
+<link rel="stylesheet" href="css/bootstrap.css" />
+<link rel="stylesheet" href="css/custom.css" />
+
+
+
+<script type="text/javascript" src="resource.js"></script>
+<script type="text/javascript" src="hi5_min.js"></script>
+<script async type="text/javascript" src="surface_min.js"></script>
+<script async type="text/javascript" src="rdp_min.js"></script>
+
+
+</head>
+<body>
+
+  <!--[if IE]>
+    <script type="text/javascript" 
+     src="http://ajax.googleapis.com/ajax/libs/chrome-frame/1/CFInstall.min.js"></script>
+
+    <style>
+     .chromeFrameInstallDefaultStyle {
+       width: 70%; 
+       border: 5px solid blue;
+     }
+    </style>
+
+    <script>
+     // The conditional ensures that this code will only execute in IE,
+     // Therefore we can use the IE-specific attachEvent without worry
+     window.attachEvent("onload", function() {
+       CFInstall.check({
+       mode: "overlay"
+       });
+     });
+    </script>
+  <![endif]-->
+
+
+<!-- following is for login dialog only -->
+<script type="text/javascript">
+
+window.$id = function (id){
+	return document.getElementById(id);
+};
+
+function checkBrowser(){
+	var hasCanvas = false;
+	var msg = "";
+	try { 
+		document.createElement("canvas").getContext("2d");
+		hasCanvas = true;
+	} catch (e) {
+		msg = "This browser does not support Canvas.\n\n";
+	};
+	
+	
+	var noWebSocket = !("WebSocket" in window) && !("MozWebSocket" in window);
+	var userAgent = navigator.userAgent;
+	var isFirefox = userAgent.indexOf("Firefox") != -1;
+		
+	if (noWebSocket){
+		msg += "This browser doesn't support WebSocket.\n\n";
+		if (isFirefox){
+			msg += "Please update to Firefox 6 or later.\n\n";
+		}
+		else if (userAgent.indexOf("Opera") != -1){
+			msg += "Please open 'opera:config#Enable WebSockets' (type it in the link field) make 'Enable WebSockets' selected and restart Opera.\n\n";
+		}
+		else if (userAgent.indexOf("MSIE") != -1){
+			msg += "Please install Google Chrome Frame.\n\n";
+		}
+	}
+	
+	if (msg.length > 0)
+		alert(msg);
+	
+	var ready = !noWebSocket && hasCanvas;
+	
+	return ready;
+};
+
+function initTimezone(){
+	var off = new Date().getStdTimezoneOffset()
+	var h = (off / 60) >> 0;
+	var zone, m = off - h * 60;
+	
+	if (h == 0){
+		zone = "(GMT)";
+	}else{
+		zone = (h < 0) ? "(GMT+" : "(GMT-";
+		h = Math.abs(h);
+		if (h < 10){
+			zone += "0";
+		}
+		zone += (h + ":" + m);
+	}
+	var tzSelect = $id("timezone");
+	var ops = tzSelect.options;
+	h = ops.length;
+	for (var i = 0; i < h; i++){
+		if (ops[i].text.indexOf(zone) == 0){
+			tzSelect.selectedIndex = i;
+			break;
+		}
+	}
+}
+
+function initUI(){
+	checkBrowser();
+	if (hi5.browser.isTouch){
+		$id("touchrow").style.display = "table-row";
+	}
+	svGlobal.util.initDragDrop($id("dropZone"), $id("frmConn"));
+	useFullBrowser();
+	initTimezone();
+	initServers();
+	var info = $id("joinSelect");
+	if (info){
+		info.onchange = function(e){
+			svManager.getInstance().setJoinMode(e.target.value);
+		};
+	}
+	
+	var control =$id("requestControl");
+	if (control){
+		control.onclick = function(e){
+			svManager.getInstance().requestControl();
+		};
+	}
+}
+	
+window.addEventListener('load', initUI, false);
+
+function initServers(){
+	var gw = $id("gateway"); 
+	var h = gw.value;
+	if (!h){
+		h = hi5.tool.queryToObj().gateway;//gateway value in the url
+		if (!h){
+			h = window.location.host;
+			if (!h) h = "localhost";
+		}
+		gw.value = h;
+	}
+
+	var server = $id("server");
+	
+	var save = $id("save");
+	var clear = $id("clear");
+	var remove = $id("delete");
+	
+	if (!Connection.hasStorage){
+		save.style.visibility="hidden";
+		clear.style.visibility="hidden";
+		remove.style.visibility="hidden";
+		return;
+	}
+	
+	loadServers().onchange = function(){
+		var key = server.value;
+		Connection.loadToForm($id("frmConn"), key);
+	};
+	
+	save.onclick = function(){
+		if (server.value.length < 1){
+			alert("Please enter computer name.");
+			return null;
+		}
+
+		var key =Connection.saveForm($id("frmConn"));
+		loadServers();
+	};
+
+	clear.onclick = function(){
+		if (confirm("All saved data will be removed?")){
+			Connection.clear();
+			loadServers();
+			server.value = "";
+		}
+	};
+	
+	remove.onclick = function(){
+		var key = $id("server").value;
+		if (key.length < 1){
+			alert("Please select a computer first.");
+			return;
+		}
+		Connection.remove(key);
+		loadServers();
+		server.value = "";
+	}
+	
+	//syncronize computers with gateway, remove following two lines and serverListCallback if you don't want to do so.
+	var addr = (("https:" == location.protocol) ?  "wss://" : "ws://") + gw.value + "/LIST";
+	getServers(addr, serverListCallback);
+
+}
+
+function loadServers(){
+	var svrs = Connection.getAll();
+	var srvs = $id("server");
+	var ops = $id("server").options;
+	ops.length = 0;
+	for (var i = 0, l = svrs.length; i < l; i++){
+		ops[i] = new Option(svrs[i]);		
+	}
+	return srvs;	
+}
+
+function useFullScreen(){
+	$id("width").value = screen.width;
+	$id("height").value = screen.height;
+};
+
+function useFullBrowser(){
+	$id("width").value = window.innerWidth;
+	$id("height").value = window.innerHeight;
+};
+
+function registerRdp(){
+	if ("registerProtocolHandler" in navigator){
+		navigator.registerProtocolHandler("web+rdp", location.protocol +"//" + location.host + "/rdpdirect.html?%s", "Spark View");
+	}
+	else{
+		alert("Sorry, your browser doesn't support this.");
+	}
+}
+
+function connectRDP(){
+	$id("server").hide();
+	var frms = $id("frmConn").elements;
+	var l = frms.length;
+	var s = "";
+	var gw;
+	var w = window.innerWidth, h = window.innerHeight, server_bpp = 16;
+	for (var i = 0; i < l; i++){
+		var field = frms[i];
+		if ((field.type=="radio" || field.type=="checkbox") && !field.checked) continue;
+		var v = field.value;
+		if (v == "")continue;
+		var n = field.name;
+		if (n == "gateway"){
+			gw = v;
+			continue;
+		}
+		else if (n == "width"){
+			w = v;
+			continue;
+		}
+		else if (n == "height"){
+			h = v;
+			continue;
+		}
+		else if (n == "server_bpp"){
+			server_bpp = v;
+			continue;
+		}
+		
+		if (s != "") s += "&";
+		s += (n + "=" + encodeURIComponent(v));
+	}
+	
+	var protocol = ("https:" == location.protocol) ? "wss://" : "ws://";
+	var frmConn = $id("frmConn");
+	var r = svManager.getInstance(); 
+	if (r == null){
+		r = new svGlobal.Rdp(protocol + gw + "/RDP?" + s, w, h, server_bpp);
+	}else{
+		var apps = r.getRunninApps();
+		var len = apps.length;
+		var isApp = $id("app").checked;
+		var warn = r.isRemoteApp() && (!isApp); 
+		if (warn){
+			var s = "Warning: A RemoteApp session is still active.\n\n";
+			for (var i = 0; i < len; i++){
+				s += apps[i] + "\n";
+			}
+			s += "\nPlease open a new Window for new sessions.\n";
+			alert(s);
+			return;
+		}
+	}
+	
+	var newWin = r.isRemoteApp() && svGlobal.isMultitask;//open in new window
+	if (newWin){
+		function onSurfaceReady(surface){
+			r.addSurface(surface);
+			console.log("remoteApp: " + frmConn["exe"].value + " arg=" + frmConn["args"].value);
+			if (r.running())
+				r.startApp(frmConn["exe"].value, frmConn["args"].value, "");
+		};
+		window.svOnSurfaceReady = onSurfaceReady;
+		var rail = window.open("rail.html");
+		rail.svOnSurfaceReady = onSurfaceReady;
+	}else{
+		$id("login").style.display = "none";
+		r.onclose = function(){
+			r.hide();
+			$id("login").style.display = "block";
+		};
+		r.addSurface(new svGlobal.LocalInterface());
+	}
+	
+	r.onerror = function(e){
+		console.log(e.name + ":" + e.message);
+	};
+
+	r.run();
+	
+	
+	
+	return false;
+};
+
+function serverListCallback(hasNew, connected){
+	if (!connected){
+		alert("Failed to connect to gateway for synchronization.");
+		return;
+	};
+	
+	if (!hasNew) return;
+	loadServers();
+	alert("Synchronization finished! new computers added to the list.");
+}
+
+</script>
+	<div class="navbar box-shadow">
+		<canvas id="remotectrl" width="1" height="1"></canvas>
+	</div>
+
+	<div id="login" style="padding: 0.5em;">
+		<tr>
+			<td>Computer</td>
+			<td>
+				<input type="hidden" name="id" />
+				<input type="text" name="server" id="server" required class="Hi5Select"/>
+			</td>
+		</tr>
+		
+		<form id="frmConn" onsubmit="connectRDP(); return false;">
+			<div>
+				Spark Gateway: <input type="text" name="gateway" id="gateway" required/>*default port is 80 if it's not specified (ip:port). 
+			</div>
+			<div class="tab_all" id="tab_demo">
+				<div class="tab">
+					<div class="tab_title">
+						<span tabIndex="0">General</span> <span tabIndex="1">Display</span><span tabIndex="2">Local</span>
+						<span tabIndex="2">Programs</span> <span tabIndex="3">Experience</span>
+					</div>
+				</div>
+				<div class="tab_body" id="dropZone">
+					<div>
+						<table>
+							<tr>
+								<td colspan="2">Enter the name of the remote computer. Open or drag a .rdp file<input type="file" id="rdpfile" name="rdpfile" /></td>
+							</tr>
+							<tr>
+								<td>Port</td>
+								<td><input type="number" name="port" value="3389" /></td>
+							</tr>
+							<tr>
+								<td>User Name</td>
+								<td><input type="text" name="user" /></td>
+							</tr>
+							<tr>
+								<td>Password</td>
+								<td><input type="password" name="pwd" /></td>
+							</tr>
+							<tr>
+								<td>Domain</td>
+								<td><input type="text" name="domain" /></td>
+							</tr>
+							<tr>
+								<td>Keyboard</td>
+								<td>
+								<select name="keyboard"> 
+										<option value="1033">English (United States)</option>
+										<option value="2057">English (United Kingdom)</option>
+										<option value="99999">Unicode (Universal)</option>
+										<option value="2060">French (Belgium)</option>
+										<option value="4105">French (Canada)</option>
+										<option value="3084">French (Canada Legacy)</option>
+										<option value="1036">French (France)</option>
+										<option value="4108">French (Switzerland)</option>
+										<option value="1031">German (Germany)</option>
+										<option value="2055">German (Switzerland)</option>
+										<option value="1040">Italian (Italy)</option>
+										<option value="1044">Norwegian (Bokmal)</option>
+										<option value="2068">Norwegian (Nynorsk)</option>
+										<option value="1049">Russian (Russia)</option>
+										<option value="1034">Spanish (Spain, Traditional Sort (ES))</option>
+										<option value="2058">Spanish (Mexico)</option>
+										<option value="3082">Spanish (International Sort)</option>
+										<option value="4106">Spanish (Guatemala)</option>
+										<option value="5130">Spanish (Costa Rica)</option>
+										<option value="6154">Spanish (Panama)</option>
+										<option value="7178">Spanish (Dominican Republic)</option>
+										<option value="8202">Spanish (Venezuela)</option>
+										<option value="9226">Spanish (Colombia)</option>
+										<option value="10250">Spanish (Peru)</option>
+										<option value="11274">Spanish (Argentina)</option>
+										<option value="12298">Spanish (Ecuador)</option>
+										<option value="13322">Spanish (Chile)</option>
+										<option value="14346">Spanish (Uruguay)</option>
+										<option value="15370">Spanish (Paraguay)</option>
+										<option value="16394">Spanish (Bolivia)</option>
+										<option value="17418">Spanish (El Salvador)</option>
+										<option value="18442">Spanish (Honduras)</option>
+										<option value="19466">Spanish (Nicaragua)</option>
+										<option value="20490">Spanish (Puerto Rico)</option>
+								</select> </td>
+							</tr>
+							<tr>
+								<td></td>
+								<td><input type="checkbox" name="useConsole" />Connect to
+									console session</td>
+							</tr>
+							<tr>
+								<td></td>
+								<td><input type="checkbox" name="legacyMode" />VirtualBox RDP or xrdp</td>
+							</tr>
+							<tr style="display:none" id="touchrow">
+								<td></td>
+								<td><input type="checkbox" name="touchpad" />Touchpad mode(Relative mouse movement)</td>
+							</tr>
+						</table>
+					</div>
+					<div>
+						<table>
+							<tr>
+								<td colspan="2">Enter the size of your remote desktop:</td>
+							</tr>
+							<tr>
+								<td>Width</td>
+								<td><input type="number" name="width" id="width"
+									value="800" /></td>
+							</tr>
+							<tr>
+								<td>Height</td>
+								<td><input type="number" name="height" id="height"
+									value="600" /></td>
+							</tr>
+							<tr>
+								<td></td>
+								<td><input type="button" name="fullBrowser"
+									value="Full browser" onclick="useFullBrowser()" /><input type="button" name="fullScreen"
+									value="Full screen" onclick="useFullScreen()" /></td>
+							</tr>
+							<tr>
+								<td>Color depth</td>
+								<td><select name="server_bpp">
+										<option value="8">256</option>
+										<option value="16" selected>High color (16 bit)</option>
+										<option value="24">True color (24 bit)</option>
+										<option value="32">Highest Quality (32 bit)</option>
+								</select></td>
+							</tr>
+							<tr>
+								<td></td>
+								<td><input type="checkbox" name="nocursor" />Disable remote cursor</td>
+							</tr>
+						</table>
+					</div>
+					<div>
+						<table>
+							<tr><td>Time Zone</td><td>
+							<select name="timezone" id="timezone">
+<option>(GMT-12:00) Dateline Standard Time</option>
+<option>(GMT-11:00) Samoa Standard Time</option>
+<option>(GMT-10:00) Hawaiian Standard Time</option>
+<option>(GMT-09:00) Alaskan Standard Time</option>
+<option>(GMT-08:00) Pacific Standard Time</option>
+<option>(GMT-07:00) US Mountain Standard Time</option>
+<option>(GMT-07:00) Mountain Standard Time</option>
+<option>(GMT-07:00) Mountain Standard Time (Mexico)</option>
+<option>(GMT-06:00) Central Standard Time</option>
+<option>(GMT-06:00) Central Standard Time (Mexico)</option>
+<option>(GMT-06:00) Central America Standard Time</option>
+<option>(GMT-06:00) Canada Central Standard Time</option>
+<option>(GMT-05:00) US Eastern Standard Time</option>
+<option>(GMT-05:00) SA Pacific Standard Time</option>
+<option>(GMT-05:00) Eastern Standard Time</option>
+<option>(GMT-04:00) SA Western Standard Time</option>
+<option>(GMT-04:00) Pacific SA Standard Time</option>
+<option>(GMT-04:00) Central Brazilian Standard Time</option>
+<option>(GMT-04:00) Atlantic Standard Time</option>
+<option>(GMT-03:30) SA Eastern Standard Time</option>
+<option>(GMT-03:30) Newfoundland Standard Time</option>
+<option>(GMT-03:30) Greenland Standard Time</option>
+<option>(GMT-03:30) E. South America Standard Time</option>
+<option>(GMT-02:00) Mid-Atlantic Standard Time</option>
+<option>(GMT-01:00) Cape Verde Standard Time</option>
+<option>(GMT-01:00) Azores Standard Time</option>
+<option>(GMT+13:00) Tonga Standard Time</option>
+<option>(GMT+12:00) New Zealand Standard Time</option>
+<option>(GMT+12:00) Fiji Standard Time</option>
+<option>(GMT+11:00) Central Pacific Standard Time</option>
+<option>(GMT+10:00) West Pacific Standard Time</option>
+<option>(GMT+10:00) Vladivostok Standard Time</option>
+<option>(GMT+10:00) Tasmania Standard Time</option>
+<option>(GMT+10:00) E. Australia Standard Time</option>
+<option>(GMT+10:00) AUS Eastern Standard Time</option>
+<option>(GMT+09:30) Cen. Australia Standard Time</option>
+<option>(GMT+09:30) AUS Central Standard Time</option>
+<option>(GMT+09:00) Yakutsk Standard Time</option>
+<option>(GMT+09:00) Tokyo Standard Time</option>
+<option>(GMT+09:00) Korea Standard Time</option>
+<option>(GMT+08:00) W. Australia Standard Time</option>
+<option>(GMT+08:00) Taipei Standard Time</option>
+<option>(GMT+08:00) Singapore Standard Time</option>
+<option>(GMT+08:00) North Asia East Standard Time</option>
+<option>(GMT+08:00) China Standard Time</option>
+<option>(GMT+07:00) SE Asia Standard Time</option>
+<option>(GMT+07:00) North Asia Standard Time</option>
+<option>(GMT+06:30) Myanmar Standard Time</option>
+<option>(GMT+06:00) Sri Lanka Standard Time</option>
+<option>(GMT+06:00) N. Central Asia Standard Time</option>
+<option>(GMT+06:00) Central Asia Standard Time</option>
+<option>(GMT+05:45) Nepal Standard Time</option>
+<option>(GMT+05:30) India Standard Time</option>
+<option>(GMT+05:00) West Asia Standard Time</option>
+<option>(GMT+05:00) Ekaterinburg Standard Time</option>
+<option>(GMT+04:30) Afghanistan Standard Time</option>
+<option>(GMT+04:00) Georgian Standard Time</option>
+<option>(GMT+04:00) Caucasus Standard Time</option>
+<option>(GMT+04:00) Azerbaijan Standard Time</option>
+<option>(GMT+04:00) Arabian Standard Time</option>
+<option>(GMT+03:30) Iran Standard Time</option>
+<option>(GMT+03:00) Russian Standard Time</option>
+<option>(GMT+03:00) E. Africa Standard Time</option>
+<option>(GMT+03:00) Arabic Standard Time</option>
+<option>(GMT+03:00) Arab Standard Time</option>
+<option>(GMT+02:00) South Africa Standard Time</option>
+<option>(GMT+02:00) Namibia Standard Time</option>
+<option>(GMT+02:00) Israel Standard Time</option>
+<option>(GMT+02:00) GTB Standard Time</option>
+<option>(GMT+02:00) FLE Standard Time</option>
+<option>(GMT+02:00) Egypt Standard Time</option>
+<option>(GMT+02:00) E. Europe Standard Time</option>
+<option>(GMT+01:00) W. Europe Standard Time</option>
+<option>(GMT+01:00) W. Central Africa Standard Time</option>
+<option>(GMT+01:00) Romance Standard Time</option>
+<option>(GMT+01:00) Central European Standard Time</option>
+<option>(GMT+01:00) Central Europe Standard Time</option>
+<option>(GMT) Greenwich Standard Time</option>
+<option>(GMT) GMT Standard Time</option>
+							</select>
+							</td></tr>
+							<tr>
+								<td>Remote audio playback</td>
+								<td><select name="playSound">
+										<option value="0">Play on this computer</option>
+										<option value="1">Do not play</option>
+										<option value="2">Play on remote computer</option>
+									</select>
+									<select name="soundPref">
+										<option value="0">Low</option>
+										<option value="1">High</option>
+									</select>
+								</td>
+							</tr>
+							<tr>
+								<td colspan="2">Choose the devices and resources that you want to use in remote session.</td>
+							</tr>
+							<tr>
+								<td></td><td><input type="checkbox" name="mapClipboard" checked/>Clipboard<input type="checkbox" name="mapPrinter" checked/>Printer</td>
+							</tr>
+							<tr>
+								<td>Printer Name</td><td><input type="text" name="printer" />Default is "Remote Printer from Client"</td>
+							</tr>
+							<tr>
+								<td></td><td><input type="checkbox" name="fastCopy" id="fastCopy"/>Fast copy(Ctrl+C for remtoe copy, press Ctrl+C twice for copying to local).</td>
+							</tr>
+							<tr>
+								<td></td><td><input type="checkbox" name="mapDisk" id="mapDisk" checked/>Uploading/Downloading files. (Drag files to your screen after connected).</td>
+							</tr>
+							<tr>
+								<td>Shared Disk Name</td><td><input type="text" name="disk" />Default is "Storage"</td>
+							</tr>
+						</table>
+					</div>
+					<div>
+						<table>
+							<tr>
+								<td colspan="2"><input type="radio" name="startProgram" id="shell" value="shell"/>Start the following program on connection:</td>
+							</tr>
+							<tr>
+								<td>&nbsp;&nbsp;Program path and file name</td>
+								<td>&nbsp;&nbsp;<input type="text" name="command" /></td>
+							</tr>
+							<tr>
+								<td>&nbsp;&nbsp;Start in following folder</td>
+								<td>&nbsp;&nbsp;<input type="text" name="directory" /></td>
+							</tr>
+							<tr>
+								<td colspan="2"><hr/></td>
+							</tr>
+							<tr>
+								<td colspan="2"><input type="radio" name="startProgram" id="app" value="app"/>RemoteApp:</td>
+							</tr>
+							<tr>
+								<td>&nbsp;&nbsp;Exe or file</td>
+								<td>&nbsp;&nbsp;<input type="text" name="exe" /></td>
+							</tr>
+							<tr>
+								<td>&nbsp;&nbsp;Arguments</td>
+								<td>&nbsp;&nbsp;<input type="text" name="args" /></td>
+							</tr>
+							<tr>
+								<td colspan="2"><hr/></td>
+							</tr>
+							<tr>
+								<td colspan="2"><input type="radio" name="startProgram" value="noapp" checked id="noapp"/>None</td>
+							</tr>
+						</table>
+					</div>
+					<div>
+						<table>
+							<tr>
+								<td>Choose your connection speed to optimize performance.</td>
+							</tr>
+							<tr>
+								<td>Allow the following:</td>
+							</tr>
+							<tr>
+								<td><input type="checkbox" name="background" />Desktop
+									background</td>
+							</tr>
+							<tr>
+								<td><input type="checkbox" name="smoothfont" />Font
+									smoothing</td>
+							</tr>
+							<tr>
+								<td><input type="checkbox" name="composition" />Desktop
+									composition</td>
+							</tr>
+							<tr>
+								<td><input type="checkbox" name="contents" />Show window
+									contents while dragging</td>
+							</tr>
+							<tr>
+								<td><input type="checkbox" name="animation" />Menu and
+									window animation</td>
+							</tr>
+							<tr>
+								<td><input type="checkbox" name="styles" />Visual styles</td>
+							</tr>
+							<tr>
+								<td><input type="checkbox" name="bitmap" />Persistent
+									bitmap caching</td>
+							</tr>
+							<tr>
+							<td>Load Banlancing <input type="text" name="loadBalanceInfo" /></td>
+							</tr>
+						</table>
+					</div>
+
+				</div>
+			</div>
+			<input type="button" name="clear" id = "clear" value="Clear" />
+			<input type="button" name="clear" id = "delete" value="Delete" />
+			<input type="button" name="save" id = "save" value="Save" />
+			<input type="submit" name="connect" value="Connect" />
+		</form>
+		
+
+		<div>
+			<h3>Tips:</h3>
+			<ul>
+				<li>You can <input type="button" name="register" id = "register" value="Register" onclick="registerRdp()" /> Spark View as "web+rdp:" protocol handler, 
+				so you can use a link like <a href="web+rdp:192.168.8.118" target="_blank">web+rdp:192.168.8.118</a> to access a computer.</li>
+				<li>Create an application shortcut on your pc or iPad to make
+					it work in full screen.</li>
+				<li>Use two fingers to scroll on touch device (Mouse wheel emulation).</li>
+			</ul>
+			<div>
+				Copyright &copy; Remote Spark Corp. 2011 <a href="http://www.remotespark.com" target="_blank">www.remotespark.com</a>
+			</div>
+		</div>
+	</div>
+	<!-- filecontainer is used for file share -->
+	<div id="filecontainer" style="overflow:auto;display:none; width:85%">
+	</div>
+	<div id="appinfo" class="appdlg">
+		<img alt="" src="info.png" style="float:left">	
+		<table>
+		<tr><td align="right"><b>Connected to:</b></td><td><span id="connectingTo"></span><br></td></tr>
+		<tr><td align="right"><b>Session id:</b></td><td><span id="numericId"></span><br></td></tr>
+		<tr><td align="right"><b>Join mode:</b></td><td>
+		<select id="joinSelect">
+			<option value="0">Every one can control</option>
+			<option value="1">Only one can control</option>
+		</select><br></td></tr>
+		<tr><td colspan="2"><b>Join this session with following link:</b><br><a id="joinLink" target="_blank"></a></td></tr>
+		<tr><td></td><td align="right"><input type="button" id="requestControl" value="Request Control" disabled="disabled" /></td></tr>
+		</table>
+	</div>
+</body>
+</html>

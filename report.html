@@ -1,0 +1,58 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>Report</title>
+<script type="text/javascript" src="gateway.js"></script>
+</head>
+<body>
+<h2>Reporting</h2>
+<script type="text/javascript">
+var reporting = null;
+function callback(obj){
+	if (obj.error){
+		alert("Error on getting report:" + obj.error);
+		return;
+	}
+	var c, cs = obj.connections;
+	var len = cs.length;
+	var s = "\nTotal connections:" + len;
+	for (var i = 0; i < len; i++){
+		c = cs[i];
+		s += ("\nconnection " + i + " ------");
+		s += ("\nclientIp: " + c.clientIp);
+		s += ("\nclientAgent: " + c.clientAgent);
+		s += ("\nserver: " + c.server);
+		s += ("\nstartTime: " + c.startTime);
+	}
+	document.getElementById("textreport").value = s;
+	reporting.close();
+}
+
+function report(){
+	var gateway = document.getElementById("gateway").value;
+	var pwd = document.getElementById("pwd").value;
+	reporting = new Gateway(gateway);
+	reporting.login(pwd);
+	reporting.report(callback);
+}
+
+
+</script>
+
+	<table>
+		<tr><td>Spark Gateway</td><td> <input type="text" name="gateway" id="gateway"
+			required /></td></tr>
+		<tr>
+			<td>Password</td>
+			<td><input type="password" name="pwd" id = "pwd" required />
+			</td>
+		</tr>
+		<tr>
+			<td>Report</td>
+			<td><textarea rows="8" cols="80" id="textreport"></textarea>
+			</td>
+		</tr>
+	</table>
+	<input type="button" name="report" value="Get Report" onclick="report();"/>
+</body>
+</html>

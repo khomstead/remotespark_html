@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="chrome=1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Spark View</title>
+<meta name="viewport"
+	content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<link rel="stylesheet" href="hi5.css" />
+<link rel="stylesheet" href="rdp.css" />
+
+<script type="text/javascript" src="resource.js"></script>
+<script type="text/javascript" src="hi5_min.js"></script>
+<script type="text/javascript" src="surface_min.js"></script>
+
+</head>
+<body>
+
+	<div>
+		<canvas id="remotectrl" width="1" height="1"></canvas>
+	</div>
+
+	<script type="text/javascript">
+		window.onload = function() {
+			var ui = new svGlobal.LocalInterface();
+			if (typeof window.svOnSurfaceReady == "function"){
+				window.svOnSurfaceReady(ui);
+			}else{
+				window.opener.svOnSurfaceReady(ui);
+			}
+		}
+	</script>
+	<!-- filecontainer is used for file share -->
+	<div id="filecontainer" style="overflow:auto;display:none; width:85%">
+	</div>
+</body>
+</html>
